@@ -141,7 +141,7 @@ class BitcoinEnv(Environment):
         self.cols_ = data.n_cols(indicators=self.hypers.indicators, arbitrage=self.hypers.arbitrage)
         self.states_ = dict(
             series=dict(type='float', shape=self.cols_),  # all state values that are time-ish
-            stationary=dict(type='float', shape=3)  # everything that doesn't care about time (cash, value, n_repeats)
+            stationary=dict(type='float', shape=11)  # everything that doesn't care about time (cash, value, n_repeats)
         )
 
         if self.conv2d:
@@ -272,15 +272,17 @@ class BitcoinEnv(Environment):
         ep_acc.i += 1
 
         first_state = self.observations[start_timestep]
+        stationary = [1., 1., 0.]
         if self.hypers.scale:
             first_state = self.scaler.transform_state(first_state)
         if self.conv2d:
             # Take note of the +1 here. LSTM uses a single index [i], which grabs the list's end. Conv uses a window,
             # [-something:i], which _excludes_ the list's end (due to Python indexing). Without this +1, conv would
             # have a 1-step-behind delayed response.
+            stationary += first_state.tolist()
             window = self.observations[start_timestep - self.hypers.step_window + 1:start_timestep + 1]
             first_state = np.expand_dims(window, axis=1)
-        return dict(series=first_state, stationary=[1., 1., 0.])
+        return dict(series=first_state, stationary=stationary)
 
     def execute(self, actions):
         if self.hypers.single_action:
@@ -340,13 +342,15 @@ class BitcoinEnv(Environment):
         repeats_scaled = step_acc.repeats / self.hypers.punish_repeats
 
         next_state = self.observations[step_acc.i]
+        stationary = [cash_scaled, val_scaled, repeats_scaled]
         if self.hypers.scale:
             next_state = self.scaler.transform_state(next_state)
             reward = self.scaler.transform_reward(reward)
         if self.conv2d:
+            stationary += next_state.tolist()
             window = self.observations[step_acc.i - self.hypers.step_window + 1:step_acc.i + 1]
             next_state = np.expand_dims(window, axis=1)
-        next_state = dict(series=next_state, stationary=[cash_scaled, val_scaled, repeats_scaled])
+        next_state = dict(series=next_state, stationary=stationary)
 
         terminal = int(step_acc.i + 1 >= len(self.observations))
         # Kill and punish if (a) agent ran out of money; (b) is doing nothing for way too long

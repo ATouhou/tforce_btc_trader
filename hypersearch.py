@@ -114,6 +114,8 @@ def build_net_spec(hypers, baseline=False):
         arr.append({'size': size, **dense})
         if net.dropout: arr.append({**dropout})
 
+    arr.append({'size': 32, **dense})
+
     return arr
 
 
@@ -145,8 +147,8 @@ def custom_net(hypers, print_net=False, baseline=False):
             apply_stationary_here = 0
             # Find the last LSTM layer, peg to the next layer (a Dense)
             for i, layer in enumerate(self.layers):
-                if isinstance(layer, TForceLayers.InternalLstm) or isinstance(layer, TForceLayers.Flatten):
-                    apply_stationary_here = i + 1
+                if isinstance(layer, TForceLayers.Dense):
+                    apply_stationary_here = i
 
             internal_outputs = list()
             index = 0
@@ -320,7 +322,7 @@ hypers['custom'] = {
     'net.width': {
         'type': 'bounded',
         'vals': [3, 9],
-        'guess': 8,
+        'guess': 5,
         'pre': round,
         'hydrate': two_to_the
     },
